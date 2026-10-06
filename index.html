@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#154739" />
+    <meta name="application-name" content="Anuoluwapo Laundry" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Anuoluwapo Laundry" />
+    <title>Anuoluwapo Laundry — Invoices</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icon.svg" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="#top" aria-label="Anuoluwapo Laundry home">
+          <span class="brand-mark">A</span>
+          <span data-business-name>ANUOLUWAPO LAUNDRY</span>
+        </a>
+        <div class="topbar-actions">
+          <button class="install-button" id="installButton" hidden>Install app</button>
+          <button class="icon-button history-button" id="historyButton" aria-label="View saved invoices">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3.5h8l3 3v14H7a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2Z"/><path d="M15 3.5v4h4M8.5 11h6M8.5 15h6"/></svg>
+            <span class="history-badge" id="historyBadge" hidden>0</span>
+          </button>
+          <button class="icon-button" id="settingsButton" aria-label="Manage price list">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="m19.4 15 .1 1.7-1.8 1.1-1.4-1a7.5 7.5 0 0 1-1.6.9l-.4 1.7h-2.1l-.5-1.7a7.3 7.3 0 0 1-1.6-.9l-1.4 1L7 16.7 7.1 15a7.8 7.8 0 0 1 0-2L7 11.3l1.8-1.1 1.4 1a7.3 7.3 0 0 1 1.6-.9l.5-1.7h2.1l.4 1.7a7.5 7.5 0 0 1 1.6.9l1.4-1 1.8 1.1-.1 1.7a7.8 7.8 0 0 1 0 2Z"/></svg>
+          </button>
+          <button class="avatar" aria-label="Laundry profile">LO</button>
+        </div>
+      </header>
+
+      <main id="top">
+        <section class="hero">
+          <div>
+            <p class="eyebrow"><span></span> TODAY'S WORK</p>
+            <h1>Every Garment<br /><em>deserve trusted care.</em></h1>
+          </div>
+          <div class="date-chip" id="dateChip"></div>
+        </section>
+
+        <section class="form-section client-section" aria-labelledby="clientHeading">
+          <div class="section-heading">
+            <div><span class="section-number">01</span><h2 id="clientHeading">Client details</h2></div>
+            <span class="optional">All fields optional</span>
+          </div>
+          <div class="client-fields">
+            <label class="field wide">
+              <span>Client name</span>
+              <input id="clientName" autocomplete="name" placeholder="e.g. Adaeze Okafor" />
+            </label>
+            <label class="field">
+              <span>Phone number</span>
+              <input id="clientPhone" type="tel" autocomplete="tel" placeholder="0800 000 0000" />
+            </label>
+          </div>
+        </section>
+
+        <section class="form-section" aria-labelledby="itemsHeading">
+          <div class="section-heading">
+            <div><span class="section-number">02</span><h2 id="itemsHeading">Laundry items</h2></div>
+            <span class="item-count" id="itemCount">0 items</span>
+          </div>
+          <div class="category-tabs" role="tablist" aria-label="Item category">
+            <button class="category-tab active" data-category="Corporate" role="tab" aria-selected="true">Corporate</button>
+            <button class="category-tab" data-category="Traditional" role="tab" aria-selected="false">Traditional</button>
+            <button class="category-tab" data-category="Custom" role="tab" aria-selected="false">Custom</button>
+          </div>
+          <div class="catalog" id="catalog"></div>
+          <button class="add-custom" id="quickCustomButton"><span>+</span> Add a custom item</button>
+        </section>
+
+        <section class="form-section order-summary" aria-labelledby="summaryHeading">
+          <div class="section-heading">
+            <div><span class="section-number">03</span><h2 id="summaryHeading">Order summary</h2></div>
+            <button class="clear-button" id="clearButton">Clear all</button>
+          </div>
+          <div class="empty-order" id="emptyOrder">
+            <span class="empty-icon">✦</span>
+            <p>Select pieces above to build this invoice.</p>
+          </div>
+          <div class="order-list" id="orderList"></div>
+          <div class="total-row">
+            <span>Total amount</span>
+            <strong id="totalAmount">₦0</strong>
+          </div>
+        </section>
+      </main>
+
+      <footer class="sticky-footer">
+        <div class="footer-total"><span>Invoice total</span><strong id="footerTotal">₦0</strong></div>
+        <button class="create-button" id="createInvoiceButton">Create invoice <span>→</span></button>
+      </footer>
+    </div>
+
+    <div class="modal-backdrop" id="settingsModal" aria-hidden="true">
+      <section class="modal pricing-modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+        <header class="modal-header"><div><p class="eyebrow"><span></span> ADMIN</p><h2 id="settingsTitle">Price list</h2></div><button class="close-button" data-close="settingsModal" aria-label="Close">×</button></header>
+        <p class="modal-intro">Your business profile and prices are stored securely on this device and used for every new invoice.</p>
+        <form class="business-profile" id="businessProfileForm">
+          <h3>Business profile</h3>
+          <div class="business-profile-row">
+            <label class="field"><span>Laundry name</span><input id="businessName" required maxlength="60" placeholder="Laundry business name" /></label>
+            <button class="save-profile" type="submit">Save name</button>
+          </div>
+        </form>
+        <div class="price-editor" id="priceEditor"></div>
+        <form class="new-item-form" id="newItemForm">
+          <h3>Add a service</h3>
+          <div class="new-item-grid">
+            <label class="field"><span>Item name</span><input id="newItemName" required placeholder="e.g. Bedding" /></label>
+            <label class="field"><span>Price (₦)</span><input id="newItemPrice" required type="number" min="0" inputmode="numeric" placeholder="0" /></label>
+          </div>
+          <div class="category-select"><button type="button" class="select-choice active" data-new-category="Corporate">Corporate</button><button type="button" class="select-choice" data-new-category="Traditional">Traditional</button><button type="button" class="select-choice" data-new-category="Custom">Custom</button></div>
+          <button class="save-service" type="submit">Add to price list</button>
+        </form>
+      </section>
+    </div>
+
+    <div class="modal-backdrop" id="invoiceModal" aria-hidden="true">
+      <section class="modal invoice-modal" role="dialog" aria-modal="true" aria-labelledby="invoiceTitle">
+        <div class="invoice-preview" id="invoicePreview"></div>
+        <div class="invoice-actions">
+          <button class="secondary-action" id="printButton">Save as PDF</button>
+          <button class="primary-action" id="shareButton">Share invoice <span>↗</span></button>
+        </div>
+        <button class="status-action" id="markPaidButton">Mark invoice as paid</button>
+        <button class="done-button" data-close="invoiceModal">Done</button>
+      </section>
+    </div>
+
+    <div class="modal-backdrop" id="historyModal" aria-hidden="true">
+      <section class="modal history-modal" role="dialog" aria-modal="true" aria-labelledby="historyTitle">
+        <header class="modal-header"><div><p class="eyebrow"><span></span> RECORDS</p><h2 id="historyTitle">Invoice history</h2></div><button class="close-button" data-close="historyModal" aria-label="Close">×</button></header>
+        <div class="history-overview" id="historyOverview"></div>
+        <label class="history-search"><span class="search-icon">⌕</span><input id="historySearch" type="search" placeholder="Search client or invoice number" /></label>
+        <div class="history-filters" role="tablist" aria-label="Filter invoices"><button class="history-filter active" data-history-filter="all">All</button><button class="history-filter" data-history-filter="open">Open</button><button class="history-filter" data-history-filter="paid">Paid</button></div>
+        <div class="history-list" id="historyList"></div>
+      </section>
+    </div>
+
+    <div class="modal-backdrop" id="installModal" aria-hidden="true">
+      <section class="modal install-modal" role="dialog" aria-modal="true" aria-labelledby="installTitle">
+        <div class="install-icon"><span class="brand-mark">A</span></div>
+        <p class="eyebrow"><span></span> ANUOLUWAPO LAUNDRY</p>
+        <h2 id="installTitle">Use it like an app.</h2>
+        <p>Install Anuoluwapo Laundry for faster access, a full-screen workspace, and offline invoice access.</p>
+        <button class="install-now-button" id="installNowButton">Install app</button>
+        <button class="install-later-button" id="installLaterButton">Maybe later</button>
+      </section>
+    </div>
+    <div class="toast" id="toast" role="status"></div>
+    <script src="app.js"></script>
+  </body>
+</html>

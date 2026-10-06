@@ -1,0 +1,20 @@
+{
+  "id": "/",
+  "name": "Anuoluwapo Laundry",
+  "short_name": "Anuoluwapo",
+  "description": "Create, save and share laundry invoices.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f3f7f5",
+  "theme_color": "#154739",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
