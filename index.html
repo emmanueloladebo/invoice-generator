@@ -83,10 +83,61 @@
             <button class="clear-button" id="clearButton">Clear all</button>
           </div>
           <div class="empty-order" id="emptyOrder">
-            <span class="empty-icon">✦</span>
+            <span class="empty-icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"></path>
+                <path d="M3 6h18"></path>
+                <path d="M16 10a4 4 0 0 1-8 0"></path>
+              </svg>
+            </span>
             <p>Select pieces above to build this invoice.</p>
           </div>
           <div class="order-list" id="orderList"></div>
+
+          <div class="tfare-box" id="tfareBox">
+            <div class="tfare-row">
+              <label class="tfare-toggle" for="tfareToggle">
+                <input type="checkbox" id="tfareToggle" />
+                <span class="tfare-switch" aria-hidden="true"></span>
+                <span class="tfare-text">
+                  <strong>Add Tfare</strong>
+                  <small>Delivery or transport fee</small>
+                </span>
+              </label>
+              <div class="tfare-input-wrap" id="tfareInputWrap">
+                <span class="tfare-currency">₦</span>
+                <input
+                  type="number"
+                  id="tfareAmount"
+                  min="0"
+                  step="100"
+                  inputmode="numeric"
+                  placeholder="0"
+                  disabled
+                  aria-label="Tfare amount"
+                />
+              </div>
+            </div>
+            <div class="tfare-presets" id="tfarePresets" hidden>
+              <span class="presets-label">Quick amount:</span>
+              <button type="button" class="preset-chip" data-tfare-preset="500">₦500</button>
+              <button type="button" class="preset-chip" data-tfare-preset="1000">₦1,000</button>
+              <button type="button" class="preset-chip" data-tfare-preset="1500">₦1,500</button>
+              <button type="button" class="preset-chip" data-tfare-preset="2000">₦2,000</button>
+            </div>
+          </div>
+
+          <div class="order-breakdown" id="orderBreakdown" hidden>
+            <div class="breakdown-line">
+              <span>Items total</span>
+              <span id="itemsSubtotal">₦0</span>
+            </div>
+            <div class="breakdown-line">
+              <span>Tfare (Transport)</span>
+              <span id="tfareSubtotal">₦0</span>
+            </div>
+          </div>
+
           <div class="total-row">
             <span>Total amount</span>
             <strong id="totalAmount">₦0</strong>
@@ -105,11 +156,26 @@
         <header class="modal-header"><div><p class="eyebrow"><span></span> ADMIN</p><h2 id="settingsTitle">Price list</h2></div><button class="close-button" data-close="settingsModal" aria-label="Close">×</button></header>
         <p class="modal-intro">Your business profile and prices are stored securely on this device and used for every new invoice.</p>
         <form class="business-profile" id="businessProfileForm">
-          <h3>Business profile</h3>
-          <div class="business-profile-row">
-            <label class="field"><span>Laundry name</span><input id="businessName" required maxlength="60" placeholder="Laundry business name" /></label>
-            <button class="save-profile" type="submit">Save name</button>
+          <h3>Business profile & Payment</h3>
+          <div class="business-profile-grid">
+            <label class="field wide">
+              <span>Laundry name</span>
+              <input id="businessName" required maxlength="60" placeholder="Laundry business name" />
+            </label>
+            <label class="field">
+              <span>Account number</span>
+              <input id="accountNumber" type="tel" inputmode="numeric" maxlength="20" placeholder="e.g. 0123456789" />
+            </label>
+            <label class="field">
+              <span>Bank name</span>
+              <input id="bankName" maxlength="40" placeholder="e.g. OPay, Moniepoint, GTBank" />
+            </label>
+            <label class="field wide">
+              <span>Account name</span>
+              <input id="accountName" maxlength="60" placeholder="e.g. Anuoluwapo Laundry" />
+            </label>
           </div>
+          <button class="save-profile" type="submit">Save profile & account</button>
         </form>
         <div class="price-editor" id="priceEditor"></div>
         <form class="new-item-form" id="newItemForm">
