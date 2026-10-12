@@ -187,6 +187,16 @@
           <div class="category-select"><button type="button" class="select-choice active" data-new-category="Corporate">Corporate</button><button type="button" class="select-choice" data-new-category="Traditional">Traditional</button><button type="button" class="select-choice" data-new-category="Custom">Custom</button></div>
           <button class="save-service" type="submit">Add to price list</button>
         </form>
+        <section class="admin-invoices-section">
+          <div class="admin-section-header">
+            <div>
+              <h3>Past invoices</h3>
+              <p class="admin-section-sub">Delete past invoices or clear all records.</p>
+            </div>
+            <button type="button" class="danger-outline-button" id="clearAllInvoicesButton">Delete all</button>
+          </div>
+          <div class="admin-invoice-list" id="adminInvoiceList"></div>
+        </section>
       </section>
     </div>
 
@@ -198,6 +208,7 @@
           <button class="primary-action" id="shareButton">Share invoice <span>↗</span></button>
         </div>
         <button class="status-action" id="markPaidButton">Mark invoice as paid</button>
+        <button class="danger-action" id="deleteCurrentInvoiceButton">Delete this invoice</button>
         <button class="done-button" data-close="invoiceModal">Done</button>
       </section>
     </div>

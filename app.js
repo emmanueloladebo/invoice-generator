@@ -44,7 +44,7 @@ localStorage.setItem('anuoluwapo-laundry-invoices', JSON.stringify(invoices));
 localStorage.removeItem('washly-invoices');
 
 function saveServices() { localStorage.setItem('anuoluwapo-laundry-services', JSON.stringify(services)); }
-function saveInvoices() { localStorage.setItem('anuoluwapo-laundry-invoices', JSON.stringify(invoices)); updateHistoryBadge(); }
+function saveInvoices() { localStorage.setItem('anuoluwapo-laundry-invoices', JSON.stringify(invoices)); updateHistoryBadge(); renderAdminInvoiceList(); }
 function saveBusiness() { localStorage.setItem('anuoluwapo-laundry-business', JSON.stringify(business)); renderBusinessBranding(); }
 function formatMoney(amount) { return money.format(Number(amount) || 0).replace('NGN', '₦').trim(); }
 function nowLabel(date = new Date()) { return date.toLocaleDateString('en-NG', { weekday:'short', day:'numeric', month:'short' }) + ' · ' + date.toLocaleTimeString('en-NG', { hour:'2-digit', minute:'2-digit' }); }
@@ -178,6 +178,59 @@ function renderInvoicePreview(invoice) {
   $('#invoicePreview').innerHTML = `<div class="invoice-brand"><div class="brand"><span class="brand-mark">A</span><strong>${escapeHtml(business.name.toUpperCase())}</strong></div><span class="invoice-tag">${paid ? 'PAID' : 'INVOICE'}</span></div><h2 class="invoice-title">Laundry receipt</h2><div class="invoice-meta">${escapeHtml(invoice.invoiceNo)}<br>${nowLabel(new Date(invoice.createdAt))}</div><div class="invoice-client"><b>Billed to</b><br>${escapeHtml(client.name || 'Walk-in client')}${client.phone ? `<br>${escapeHtml(client.phone)}` : ''}</div><div class="invoice-lines">${linesHtml}${tfareHtml}</div><div class="invoice-grand-total"><span>TOTAL ${paid ? 'PAID' : 'DUE'}</span><strong>${formatMoney(invoice.total)}</strong></div>${paymentBoxHtml}<p class="invoice-note">Thank you for choosing ${escapeHtml(business.name)}. We handle your things with care.</p>`;
   const statusButton = $('#markPaidButton'); statusButton.textContent = paid ? 'Marked as paid' : 'Mark invoice as paid'; statusButton.classList.toggle('is-paid', paid); statusButton.disabled = paid;
 }
+function renderAdminInvoiceList() {
+  const container = $('#adminInvoiceList');
+  if (!container) return;
+  const clearBtn = $('#clearAllInvoicesButton');
+  if (!invoices.length) {
+    container.innerHTML = `<p class="empty-admin-invoices">No past invoices saved.</p>`;
+    if (clearBtn) clearBtn.disabled = true;
+    return;
+  }
+  if (clearBtn) clearBtn.disabled = false;
+  container.innerHTML = invoices.map(invoice => `
+    <div class="admin-invoice-row">
+      <div class="admin-invoice-info">
+        <strong>${escapeHtml(invoice.client?.name || 'Walk-in client')}</strong>
+        <span>${escapeHtml(invoice.invoiceNo)} · ${shortDate(invoice.createdAt)} · ${formatMoney(invoice.total)}</span>
+      </div>
+      <button type="button" class="admin-delete-invoice-btn" data-delete-invoice="${escapeHtml(invoice.id)}" aria-label="Delete invoice ${escapeHtml(invoice.invoiceNo)}">Delete</button>
+    </div>
+  `).join('');
+}
+
+function deleteInvoice(id) {
+  const target = invoices.find(entry => entry.id === id);
+  if (!target) return;
+  const ok = window.confirm(`Delete invoice ${target.invoiceNo}? This cannot be undone.`);
+  if (!ok) return;
+  invoices = invoices.filter(entry => entry.id !== id);
+  saveInvoices();
+  renderHistory();
+  if (activeInvoice && activeInvoice.id === id) {
+    closeModal('invoiceModal');
+    activeInvoice = null;
+  }
+  toast(`Invoice ${target.invoiceNo} deleted`);
+}
+
+function clearAllInvoices() {
+  if (!invoices.length) {
+    toast('No past invoices to delete');
+    return;
+  }
+  const ok = window.confirm(`Delete all ${invoices.length} past invoices? This cannot be undone.`);
+  if (!ok) return;
+  invoices = [];
+  saveInvoices();
+  renderHistory();
+  if (activeInvoice) {
+    closeModal('invoiceModal');
+    activeInvoice = null;
+  }
+  toast('All past invoices deleted');
+}
+
 function renderHistory() {
   const query = $('#historySearch').value.trim().toLowerCase();
   const shown = invoices.filter(invoice => {
@@ -188,7 +241,23 @@ function renderHistory() {
   const paid = invoices.filter(invoice => invoice.status === 'paid');
   const open = invoices.filter(invoice => invoice.status !== 'paid');
   $('#historyOverview').innerHTML = `<div class="history-stat"><span>Invoices</span><strong>${invoices.length}</strong></div><div class="history-stat"><span>Open value</span><strong>${formatMoney(open.reduce((sum, invoice) => sum + invoice.total, 0))}</strong></div><div class="history-stat"><span>Paid value</span><strong>${formatMoney(paid.reduce((sum, invoice) => sum + invoice.total, 0))}</strong></div>`;
-  $('#historyList').innerHTML = shown.length ? shown.map(invoice => `<button class="history-card" data-open-invoice="${escapeHtml(invoice.id)}"><span class="history-card-main"><span class="history-card-title">${escapeHtml(invoice.client?.name || 'Walk-in client')}</span><span class="history-card-meta">${escapeHtml(invoice.invoiceNo)} · ${shortDate(invoice.createdAt)}</span></span><span class="history-card-total"><strong>${formatMoney(invoice.total)}</strong><span class="status-pill ${invoice.status === 'paid' ? 'paid' : ''}">${invoice.status === 'paid' ? 'Paid' : 'Open'}</span></span></button>`).join('') : `<div class="empty-history">No matching invoices yet.</div>`;
+  $('#historyList').innerHTML = shown.length ? shown.map(invoice => `
+    <div class="history-item">
+      <button class="history-card" data-open-invoice="${escapeHtml(invoice.id)}">
+        <span class="history-card-main">
+          <span class="history-card-title">${escapeHtml(invoice.client?.name || 'Walk-in client')}</span>
+          <span class="history-card-meta">${escapeHtml(invoice.invoiceNo)} · ${shortDate(invoice.createdAt)}</span>
+        </span>
+        <span class="history-card-total">
+          <strong>${formatMoney(invoice.total)}</strong>
+          <span class="status-pill ${invoice.status === 'paid' ? 'paid' : ''}">${invoice.status === 'paid' ? 'Paid' : 'Open'}</span>
+        </span>
+      </button>
+      <button type="button" class="history-delete-btn" data-delete-invoice="${escapeHtml(invoice.id)}" aria-label="Delete invoice ${escapeHtml(invoice.invoiceNo)}">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18m-2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+      </button>
+    </div>
+  `).join('') : `<div class="empty-history">No matching invoices yet.</div>`;
 }
 function openSavedInvoice(id) {
   const invoice = invoices.find(entry => entry.id === id); if (!invoice) return;
@@ -295,7 +364,7 @@ async function shareInvoice() {
 }
 
 $('#dateChip').textContent = nowLabel(); setInterval(() => $('#dateChip').textContent = nowLabel(), 30000);
-renderBusinessBranding(); renderCatalog(); renderCart(); updateHistoryBadge();
+renderBusinessBranding(); renderCatalog(); renderCart(); updateHistoryBadge(); renderAdminInvoiceList();
 
 $('#tfareToggle')?.addEventListener('change', event => {
   tfareEnabled = event.target.checked;
@@ -318,12 +387,26 @@ $('#tfareAmount')?.addEventListener('input', event => {
 });
 
 document.addEventListener('click', event => {
+  const deleteInvoiceBtn = event.target.closest('[data-delete-invoice]');
+  if (deleteInvoiceBtn) {
+    event.stopPropagation();
+    deleteInvoice(deleteInvoiceBtn.dataset.deleteInvoice);
+    return;
+  }
+  if (event.target.closest('#clearAllInvoicesButton')) {
+    clearAllInvoices();
+    return;
+  }
+  if (event.target.closest('#deleteCurrentInvoiceButton')) {
+    if (activeInvoice) deleteInvoice(activeInvoice.id);
+    return;
+  }
   const serviceCard = event.target.closest('[data-service-id]'); if (serviceCard) addService(serviceCard.dataset.serviceId);
   const action = event.target.closest('[data-cart-action]'); if (action) adjustCart(action.dataset.id, action.dataset.cartAction === 'add' ? 1 : -1);
   const tab = event.target.closest('.category-tab'); if (tab) { activeCategory = tab.dataset.category; document.querySelectorAll('.category-tab').forEach(item => { const active = item === tab; item.classList.toggle('active', active); item.setAttribute('aria-selected', active); }); renderCatalog(); }
   const close = event.target.closest('[data-close]'); if (close) closeModal(close.dataset.close);
   if (event.target.classList.contains('modal-backdrop')) closeModal(event.target.id);
-  if (event.target.closest('#settingsButton')) { renderPriceEditor(); openModal('settingsModal'); }
+  if (event.target.closest('#settingsButton')) { renderPriceEditor(); renderAdminInvoiceList(); openModal('settingsModal'); }
   if (event.target.closest('#historyButton')) { renderHistory(); openModal('historyModal'); }
   if (event.target.closest('#quickCustomButton')) { renderPriceEditor(); openModal('settingsModal'); setTimeout(() => $('#newItemName').focus(), 200); }
   const newCategory = event.target.closest('[data-new-category]'); if (newCategory) { newItemCategory = newCategory.dataset.newCategory; document.querySelectorAll('[data-new-category]').forEach(button => button.classList.toggle('active', button === newCategory)); }
