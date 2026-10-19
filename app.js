@@ -201,6 +201,18 @@ function renderInvoicePreview(invoice) {
     </div>
   ` : '';
 
+  const paymentNoticeHtml = !paid ? `
+    <div class="invoice-upfront-notice">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+      <span>Please note: Upfront payment is required before work starts.</span>
+    </div>
+  ` : `
+    <div class="invoice-upfront-notice paid">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>
+      <span>Payment confirmed in full. Thank you!</span>
+    </div>
+  `;
+
   const paymentBoxHtml = accountNumber ? `
     <div class="invoice-payment-box">
       <div class="payment-box-head">
@@ -218,7 +230,7 @@ function renderInvoicePreview(invoice) {
     </div>
   ` : '';
 
-  $('#invoicePreview').innerHTML = `<div class="invoice-brand"><div class="brand"><span class="brand-mark">A</span><strong>${escapeHtml(business.name.toUpperCase())}</strong></div><span class="invoice-tag">${paid ? 'PAID' : 'INVOICE'}</span></div><h2 class="invoice-title">Laundry receipt</h2><div class="invoice-meta">${escapeHtml(invoice.invoiceNo)}<br>${nowLabel(new Date(invoice.createdAt))}</div><div class="invoice-client"><b>Billed to</b><br>${escapeHtml(client.name || 'Walk-in client')}${client.phone ? `<br>${escapeHtml(client.phone)}` : ''}</div><div class="invoice-lines">${linesHtml}</div>${breakdownHtml}<div class="invoice-grand-total"><span>TOTAL ${paid ? 'PAID' : 'DUE'}</span><strong>${formatMoney(invoice.total)}</strong></div>${paymentBoxHtml}<p class="invoice-note">Thank you for choosing ${escapeHtml(business.name)}. We handle your things with care.</p>`;
+  $('#invoicePreview').innerHTML = `<div class="invoice-brand"><div class="brand"><span class="brand-mark">A</span><strong>${escapeHtml(business.name.toUpperCase())}</strong></div><span class="invoice-tag">${paid ? 'PAID' : 'INVOICE'}</span></div><h2 class="invoice-title">Laundry receipt</h2><div class="invoice-meta">${escapeHtml(invoice.invoiceNo)}<br>${nowLabel(new Date(invoice.createdAt))}</div><div class="invoice-client"><b>Billed to</b><br>${escapeHtml(client.name || 'Walk-in client')}${client.phone ? `<br>${escapeHtml(client.phone)}` : ''}</div><div class="invoice-lines">${linesHtml}</div>${breakdownHtml}<div class="invoice-grand-total"><span>TOTAL ${paid ? 'PAID' : 'DUE'}</span><strong>${formatMoney(invoice.total)}</strong></div>${paymentNoticeHtml}${paymentBoxHtml}<p class="invoice-note">Thank you for choosing ${escapeHtml(business.name)}. We handle your things with care.</p>`;
   const statusButton = $('#markPaidButton'); statusButton.textContent = paid ? 'Marked as paid' : 'Mark invoice as paid'; statusButton.classList.toggle('is-paid', paid); statusButton.disabled = paid;
 }
 function renderAdminInvoiceList() {
@@ -341,6 +353,7 @@ async function createReceiptImage(invoice) {
     try { await document.fonts.ready; } catch {}
   }
   const width = 1080, padding = 76, row = 58, client = invoice.client || {};
+  const isPaid = invoice.status === 'paid';
   const tfare = getInvoiceTfare(invoice);
   const itemsSum = (invoice.items || []).reduce((sum, it) => sum + (Number(it.price) || 0) * (Number(it.quantity) || 1), 0);
   const accountNumber = invoice.accountNumber || business.accountNumber || '';
@@ -348,7 +361,7 @@ async function createReceiptImage(invoice) {
   const accountName = invoice.accountName || business.accountName || '';
   const hasAccount = Boolean(accountNumber);
 
-  let extraHeight = 0;
+  let extraHeight = 68;
   if (tfare > 0) extraHeight += (row * 2) + 20;
   if (hasAccount) extraHeight += 160;
   if (client.phone) extraHeight += 28;
@@ -386,13 +399,31 @@ async function createReceiptImage(invoice) {
   }
 
   ctx.strokeStyle = '#9cafaa'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(padding, y - 18); ctx.lineTo(width - padding, y - 18); ctx.stroke();
-  ctx.fillStyle = '#58706b'; ctx.font = '700 18px Manrope, Arial'; ctx.fillText(`TOTAL ${invoice.status === 'paid' ? 'PAID' : 'DUE'}`, padding, y + 29);
+  ctx.fillStyle = '#58706b'; ctx.font = '700 18px Manrope, Arial'; ctx.fillText(`TOTAL ${isPaid ? 'PAID' : 'DUE'}`, padding, y + 29);
   ctx.textAlign = 'right'; ctx.fillStyle = '#10282a'; ctx.font = '800 39px Manrope, Arial'; ctx.fillText(formatMoney(invoice.total), width - padding, y + 33);
   ctx.textAlign = 'left';
 
+  // Upfront payment notice pill
+  y += 58;
+  const boxWidth = width - (padding * 2);
+  ctx.fillStyle = isPaid ? '#eaf8ef' : '#edf7f2';
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(padding, y, boxWidth, 44, 9);
+  else ctx.rect(padding, y, boxWidth, 44);
+  ctx.fill();
+  ctx.strokeStyle = isPaid ? '#bce7ce' : '#c6e2d4';
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+
+  ctx.fillStyle = isPaid ? '#176643' : '#1e5447';
+  ctx.font = '700 17px Manrope, Arial';
+  const noticeText = isPaid
+    ? '✓ Payment confirmed in full. Thank you!'
+    : '• Please note: Upfront payment is required before work starts.';
+  ctx.fillText(noticeText, padding + 18, y + 27);
+
   if (hasAccount) {
-    y += 75;
-    const boxWidth = width - (padding * 2);
+    y += 58;
     ctx.fillStyle = '#f4f8f6';
     ctx.beginPath();
     if (ctx.roundRect) ctx.roundRect(padding, y, boxWidth, 116, 14);
@@ -416,6 +447,7 @@ async function createReceiptImage(invoice) {
 async function shareInvoice() {
   if (!activeInvoice) return;
   const client = activeInvoice.client || {};
+  const paid = activeInvoice.status === 'paid';
   const tfare = getInvoiceTfare(activeInvoice);
   const itemsSum = (activeInvoice.items || []).reduce((sum, it) => sum + (Number(it.price) || 0) * (Number(it.quantity) || 1), 0);
   const accountNumber = activeInvoice.accountNumber || business.accountNumber || '';
@@ -424,9 +456,12 @@ async function shareInvoice() {
 
   const lines = activeInvoice.items.map(item => `• ${item.name} × ${item.quantity} — ${formatMoney(item.price * item.quantity)}`).join('\n');
   const tfareSection = tfare > 0 ? `\n\nItems total: ${formatMoney(itemsSum)}\nT-fare (Transport): ${formatMoney(tfare)}` : '';
+  const upfrontNotice = paid
+    ? '\n\n*Payment confirmed in full. Thank you!*'
+    : '\n\n*Please note: Upfront payment is required before work starts.*';
   const paymentInfo = accountNumber ? `\n\nPAYMENT DETAILS:\n• Account Number: ${accountNumber}${bankName ? `\n• Bank: ${bankName}` : ''}${accountName ? `\n• Account Name: ${accountName}` : ''}` : '';
 
-  const text = `${business.name.toUpperCase()} INVOICE · ${activeInvoice.invoiceNo}\n${nowLabel(new Date(activeInvoice.createdAt))}\nFor: ${client.name || 'Walk-in client'}\n\n${lines}${tfareSection}\n\nTOTAL: ${formatMoney(activeInvoice.total)}${paymentInfo}\n\nThank you for choosing ${business.name}.`;
+  const text = `${business.name.toUpperCase()} INVOICE · ${activeInvoice.invoiceNo}\n${nowLabel(new Date(activeInvoice.createdAt))}\nFor: ${client.name || 'Walk-in client'}\n\n${lines}${tfareSection}\n\nTOTAL: ${formatMoney(activeInvoice.total)}${upfrontNotice}${paymentInfo}\n\nThank you for choosing ${business.name}.`;
   try {
     const imageBlob = await createReceiptImage(activeInvoice);
     const file = imageBlob && new File([imageBlob], `${activeInvoice.invoiceNo}.png`, { type:'image/png' });

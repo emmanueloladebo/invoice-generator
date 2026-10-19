@@ -37,6 +37,14 @@
         </div>
       </header>
 
+      <div class="edit-banner" id="editBanner" hidden>
+        <div class="edit-banner-content">
+          <span class="edit-banner-badge">EDITING</span>
+          <span class="edit-banner-text">Editing invoice <strong id="editingInvoiceNo"></strong></span>
+        </div>
+        <button type="button" class="cancel-edit-btn" id="cancelEditButton">Cancel edit</button>
+      </div>
+
       <main id="top">
         <section class="hero">
           <div>
@@ -208,6 +216,7 @@
           <button class="secondary-action" id="downloadImageButton">Save image</button>
           <button class="primary-action" id="shareButton">Share invoice <span>↗</span></button>
         </div>
+        <button type="button" class="edit-action" id="editInvoiceButton">Edit this invoice</button>
         <button class="status-action" id="markPaidButton">Mark invoice as paid</button>
         <button class="danger-action" id="deleteCurrentInvoiceButton">Delete this invoice</button>
         <button class="done-button" data-close="invoiceModal">Done</button>
