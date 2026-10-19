@@ -1,4 +1,4 @@
-const CACHE_NAME = 'anuoluwapo-laundry-v5';
+const CACHE_NAME = 'anuoluwapo-laundry-v6';
 const APP_SHELL = [
   '/',
   '/index.html',

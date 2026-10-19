@@ -36,6 +36,7 @@ let tfareAmount = 0;
 let activeCategory = 'Corporate';
 let newItemCategory = 'Corporate';
 let activeInvoice = null;
+let editingInvoiceId = null;
 let historyFilter = 'all';
 let deferredInstallPrompt = null;
 
@@ -177,6 +178,108 @@ function createInvoice() {
   };
   invoices.unshift(invoice); activeInvoice = invoice; saveInvoices(); renderInvoicePreview(invoice); return invoice;
 }
+
+function updateExistingInvoice(id) {
+  const idx = invoices.findIndex(entry => entry.id === id);
+  if (idx === -1) {
+    toast('Invoice not found');
+    cancelEditingInvoice(true);
+    return null;
+  }
+  const existing = invoices[idx];
+  const appliedTfare = getActiveTfare();
+  const updatedInvoice = {
+    ...existing,
+    client: {
+      name: $('#clientName').value.trim() || 'Walk-in client',
+      phone: $('#clientPhone').value.trim()
+    },
+    items: cart.map(item => ({ id: item.id, name: item.name, price: item.price, quantity: item.quantity })),
+    tfare: appliedTfare,
+    total: cartTotal() + appliedTfare,
+    accountNumber: business.accountNumber || existing.accountNumber || '',
+    bankName: business.bankName || existing.bankName || '',
+    accountName: business.accountName || existing.accountName || '',
+    updatedAt: new Date().toISOString()
+  };
+  invoices[idx] = updatedInvoice;
+  activeInvoice = updatedInvoice;
+  saveInvoices();
+  renderHistory();
+  cancelEditingInvoice(true);
+  cart = [];
+  setTfare(0, false);
+  if ($('#clientName')) $('#clientName').value = '';
+  if ($('#clientPhone')) $('#clientPhone').value = '';
+  renderCart();
+  renderInvoicePreview(updatedInvoice);
+  openModal('invoiceModal');
+  toast(`Invoice ${updatedInvoice.invoiceNo} updated`);
+  return updatedInvoice;
+}
+
+function startEditingInvoice(id) {
+  const invoice = invoices.find(entry => entry.id === id);
+  if (!invoice) return;
+  editingInvoiceId = invoice.id;
+  activeInvoice = invoice;
+
+  if ($('#clientName')) {
+    $('#clientName').value = invoice.client?.name && invoice.client.name !== 'Walk-in client' ? invoice.client.name : '';
+  }
+  if ($('#clientPhone')) {
+    $('#clientPhone').value = invoice.client?.phone || '';
+  }
+
+  cart = (invoice.items || []).map(item => ({
+    id: item.id || `item-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    name: item.name,
+    price: Number(item.price) || 0,
+    quantity: Number(item.quantity) || 1,
+    category: item.category || 'Custom'
+  }));
+
+  const tfare = getInvoiceTfare(invoice);
+  setTfare(tfare, false);
+
+  const banner = $('#editBanner');
+  if (banner) {
+    banner.hidden = false;
+    const noSpan = $('#editingInvoiceNo');
+    if (noSpan) noSpan.textContent = invoice.invoiceNo;
+  }
+
+  const createBtn = $('#createInvoiceButton');
+  if (createBtn) {
+    createBtn.innerHTML = 'Update invoice <span>→</span>';
+  }
+
+  closeModal('invoiceModal');
+  closeModal('historyModal');
+  closeModal('settingsModal');
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  toast(`Editing invoice ${invoice.invoiceNo}`);
+}
+
+function cancelEditingInvoice(silent = false) {
+  editingInvoiceId = null;
+  const banner = $('#editBanner');
+  if (banner) banner.hidden = true;
+  const createBtn = $('#createInvoiceButton');
+  if (createBtn) {
+    createBtn.innerHTML = 'Create invoice <span>→</span>';
+  }
+  if (!silent) {
+    cart = [];
+    setTfare(0, false);
+    if ($('#clientName')) $('#clientName').value = '';
+    if ($('#clientPhone')) $('#clientPhone').value = '';
+    renderCart();
+    toast('Edit cancelled');
+  }
+}
+
 function renderInvoicePreview(invoice) {
   if (!invoice) return;
   const paid = invoice.status === 'paid';
@@ -231,8 +334,12 @@ function renderInvoicePreview(invoice) {
   ` : '';
 
   $('#invoicePreview').innerHTML = `<div class="invoice-brand"><div class="brand"><span class="brand-mark">A</span><strong>${escapeHtml(business.name.toUpperCase())}</strong></div><span class="invoice-tag">${paid ? 'PAID' : 'INVOICE'}</span></div><h2 class="invoice-title">Laundry receipt</h2><div class="invoice-meta">${escapeHtml(invoice.invoiceNo)}<br>${nowLabel(new Date(invoice.createdAt))}</div><div class="invoice-client"><b>Billed to</b><br>${escapeHtml(client.name || 'Walk-in client')}${client.phone ? `<br>${escapeHtml(client.phone)}` : ''}</div><div class="invoice-lines">${linesHtml}</div>${breakdownHtml}<div class="invoice-grand-total"><span>TOTAL ${paid ? 'PAID' : 'DUE'}</span><strong>${formatMoney(invoice.total)}</strong></div>${paymentNoticeHtml}${paymentBoxHtml}<p class="invoice-note">Thank you for choosing ${escapeHtml(business.name)}. We handle your things with care.</p>`;
-  const statusButton = $('#markPaidButton'); statusButton.textContent = paid ? 'Marked as paid' : 'Mark invoice as paid'; statusButton.classList.toggle('is-paid', paid); statusButton.disabled = paid;
+  const statusButton = $('#markPaidButton');
+  statusButton.textContent = paid ? 'Mark invoice as unpaid' : 'Mark invoice as paid';
+  statusButton.classList.toggle('is-paid', paid);
+  statusButton.disabled = false;
 }
+
 function renderAdminInvoiceList() {
   const container = $('#adminInvoiceList');
   if (!container) return;
@@ -249,7 +356,10 @@ function renderAdminInvoiceList() {
         <strong>${escapeHtml(invoice.client?.name || 'Walk-in client')}</strong>
         <span>${escapeHtml(invoice.invoiceNo)} · ${shortDate(invoice.createdAt)} · ${formatMoney(invoice.total)}</span>
       </div>
-      <button type="button" class="admin-delete-invoice-btn" data-delete-invoice="${escapeHtml(invoice.id)}" aria-label="Delete invoice ${escapeHtml(invoice.invoiceNo)}">Delete</button>
+      <div class="admin-invoice-actions">
+        <button type="button" class="admin-edit-invoice-btn" data-edit-invoice="${escapeHtml(invoice.id)}" aria-label="Edit invoice ${escapeHtml(invoice.invoiceNo)}">Edit</button>
+        <button type="button" class="admin-delete-invoice-btn" data-delete-invoice="${escapeHtml(invoice.id)}" aria-label="Delete invoice ${escapeHtml(invoice.invoiceNo)}">Delete</button>
+      </div>
     </div>
   `).join('');
 }
@@ -259,6 +369,14 @@ function deleteInvoice(id) {
   if (!target) return;
   const ok = window.confirm(`Delete invoice ${target.invoiceNo}? This cannot be undone.`);
   if (!ok) return;
+  if (editingInvoiceId === id) {
+    cancelEditingInvoice(true);
+    cart = [];
+    setTfare(0, false);
+    if ($('#clientName')) $('#clientName').value = '';
+    if ($('#clientPhone')) $('#clientPhone').value = '';
+    renderCart();
+  }
   invoices = invoices.filter(entry => entry.id !== id);
   saveInvoices();
   renderHistory();
@@ -276,6 +394,14 @@ function clearAllInvoices() {
   }
   const ok = window.confirm(`Delete all ${invoices.length} past invoices? This cannot be undone.`);
   if (!ok) return;
+  if (editingInvoiceId) {
+    cancelEditingInvoice(true);
+    cart = [];
+    setTfare(0, false);
+    if ($('#clientName')) $('#clientName').value = '';
+    if ($('#clientPhone')) $('#clientPhone').value = '';
+    renderCart();
+  }
   invoices = [];
   saveInvoices();
   renderHistory();
@@ -308,6 +434,9 @@ function renderHistory() {
           <span class="status-pill ${invoice.status === 'paid' ? 'paid' : ''}">${invoice.status === 'paid' ? 'Paid' : 'Open'}</span>
         </span>
       </button>
+      <button type="button" class="history-edit-btn" data-edit-invoice="${escapeHtml(invoice.id)}" aria-label="Edit invoice ${escapeHtml(invoice.invoiceNo)}">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+      </button>
       <button type="button" class="history-delete-btn" data-delete-invoice="${escapeHtml(invoice.id)}" aria-label="Delete invoice ${escapeHtml(invoice.invoiceNo)}">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18m-2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
       </button>
@@ -318,11 +447,15 @@ function openSavedInvoice(id) {
   const invoice = invoices.find(entry => entry.id === id); if (!invoice) return;
   activeInvoice = invoice; renderInvoicePreview(invoice); closeModal('historyModal'); openModal('invoiceModal');
 }
-function markActiveInvoicePaid() {
-  if (!activeInvoice || activeInvoice.status === 'paid') return;
-  activeInvoice.status = 'paid';
-  invoices = invoices.map(invoice => invoice.id === activeInvoice.id ? activeInvoice : invoice);
-  saveInvoices(); renderInvoicePreview(activeInvoice); renderHistory(); toast('Invoice marked as paid');
+function toggleActiveInvoicePaid() {
+  if (!activeInvoice) return;
+  const nextStatus = activeInvoice.status === 'paid' ? 'open' : 'paid';
+  activeInvoice.status = nextStatus;
+  invoices = invoices.map(invoice => invoice.id === activeInvoice.id ? { ...invoice, status: nextStatus } : invoice);
+  saveInvoices();
+  renderInvoicePreview(activeInvoice);
+  renderHistory();
+  toast(nextStatus === 'paid' ? 'Invoice marked as paid' : 'Invoice marked as unpaid');
 }
 function downloadReceiptBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
@@ -508,6 +641,20 @@ $('#tfareAmount')?.addEventListener('input', event => {
 });
 
 document.addEventListener('click', event => {
+  const editInvoiceBtn = event.target.closest('[data-edit-invoice]');
+  if (editInvoiceBtn) {
+    event.stopPropagation();
+    startEditingInvoice(editInvoiceBtn.dataset.editInvoice);
+    return;
+  }
+  if (event.target.closest('#editInvoiceButton')) {
+    if (activeInvoice) startEditingInvoice(activeInvoice.id);
+    return;
+  }
+  if (event.target.closest('#cancelEditButton')) {
+    cancelEditingInvoice(false);
+    return;
+  }
   const deleteInvoiceBtn = event.target.closest('[data-delete-invoice]');
   if (deleteInvoiceBtn) {
     event.stopPropagation();
@@ -573,11 +720,23 @@ $('#businessProfileForm').addEventListener('submit', event => {
 });
 $('#newItemForm').addEventListener('submit', event => { event.preventDefault(); const name = $('#newItemName').value.trim(); const price = Number($('#newItemPrice').value); if (!name || Number.isNaN(price)) return; services.push({ id:`custom-${Date.now()}`, name, category:newItemCategory, price }); saveServices(); activeCategory = newItemCategory; $('#newItemForm').reset(); renderPriceEditor(); document.querySelectorAll('.category-tab').forEach(tab => { const active = tab.dataset.category === activeCategory; tab.classList.toggle('active', active); tab.setAttribute('aria-selected', active); }); renderCatalog(); toast(`${name} added to price list`); });
 $('#historySearch').addEventListener('input', renderHistory);
-$('#createInvoiceButton').addEventListener('click', () => { if (!cart.length) { toast('Add at least one laundry item first'); return; } createInvoice(); openModal('invoiceModal'); toast('Invoice saved to your records'); });
+$('#createInvoiceButton').addEventListener('click', () => {
+  if (!cart.length) {
+    toast('Add at least one laundry item first');
+    return;
+  }
+  if (editingInvoiceId) {
+    updateExistingInvoice(editingInvoiceId);
+  } else {
+    createInvoice();
+    openModal('invoiceModal');
+    toast('Invoice saved to your records');
+  }
+});
 $('#shareButton').addEventListener('click', shareInvoice);
 $('#downloadImageButton')?.addEventListener('click', downloadActiveInvoiceImage);
 $('#printButton').addEventListener('click', () => window.print());
-$('#markPaidButton').addEventListener('click', markActiveInvoicePaid);
+$('#markPaidButton').addEventListener('click', toggleActiveInvoicePaid);
 document.addEventListener('keydown', event => { if (event.key === 'Escape') document.querySelectorAll('.modal-backdrop.open').forEach(modal => closeModal(modal.id)); });
 
 async function requestInstall() {
