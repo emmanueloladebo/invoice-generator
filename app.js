@@ -51,7 +51,34 @@ function nowLabel(date = new Date()) { return date.toLocaleDateString('en-NG', {
 function shortDate(dateString) { return new Date(dateString).toLocaleDateString('en-NG', { day:'numeric', month:'short', year:'numeric' }); }
 function cartTotal() { return cart.reduce((sum, item) => sum + item.price * item.quantity, 0); }
 function itemTotal() { return cart.reduce((sum, item) => sum + item.quantity, 0); }
-function getActiveTfare() { return tfareEnabled ? Math.max(0, Number(tfareAmount) || 0) : 0; }
+function getActiveTfare() {
+  const input = $('#tfareAmount');
+  const val = input ? parseFloat(input.value) : NaN;
+  if (!Number.isNaN(val) && val > 0) return val;
+  if (tfareEnabled && tfareAmount > 0) return tfareAmount;
+  return 0;
+}
+function getInvoiceTfare(invoice) {
+  if (!invoice) return 0;
+  const direct = Number(invoice.tfare);
+  if (!Number.isNaN(direct) && direct > 0) return direct;
+  const itemsSum = (invoice.items || []).reduce((sum, it) => sum + (Number(it.price) || 0) * (Number(it.quantity) || 1), 0);
+  const diff = (Number(invoice.total) || 0) - itemsSum;
+  return diff > 0 ? diff : 0;
+}
+function setTfare(amount, shouldFocus = false) {
+  const num = Math.max(0, Number(amount) || 0);
+  tfareAmount = num;
+  tfareEnabled = num > 0;
+  const toggle = $('#tfareToggle');
+  const input = $('#tfareAmount');
+  if (toggle) toggle.checked = tfareEnabled;
+  if (input) {
+    input.value = num > 0 ? num : '';
+    if (shouldFocus) input.focus();
+  }
+  renderCart();
+}
 function orderTotal() { return cartTotal() + getActiveTfare(); }
 function makeInvoiceNumber(date = new Date()) {
   const count = Number(localStorage.getItem('anuoluwapo-laundry-invoice-sequence') || localStorage.getItem('washly-invoice-sequence') || 0) + 1;
@@ -98,7 +125,11 @@ function renderCart() {
 
   document.querySelectorAll('[data-tfare-preset]').forEach(chip => {
     const val = Number(chip.dataset.tfarePreset);
-    chip.classList.toggle('active', tfareEnabled && tfareAmount === val);
+    if (val === 0) {
+      chip.classList.toggle('active', currentTfare === 0);
+    } else {
+      chip.classList.toggle('active', currentTfare === val);
+    }
   });
 
   $('#totalAmount').textContent = formatMoney(total);
@@ -150,13 +181,25 @@ function renderInvoicePreview(invoice) {
   if (!invoice) return;
   const paid = invoice.status === 'paid';
   const client = invoice.client || {};
-  const tfare = Number(invoice.tfare || 0);
+  const tfare = getInvoiceTfare(invoice);
+  const itemsSum = (invoice.items || []).reduce((sum, it) => sum + (Number(it.price) || 0) * (Number(it.quantity) || 1), 0);
   const accountNumber = invoice.accountNumber || business.accountNumber || '';
   const bankName = invoice.bankName || business.bankName || '';
   const accountName = invoice.accountName || business.accountName || '';
 
   const linesHtml = invoice.items.map(item => `<div class="invoice-line"><span>${escapeHtml(item.name)} <small>× ${item.quantity}</small></span><span>${formatMoney(item.price * item.quantity)}</span></div>`).join('');
-  const tfareHtml = tfare > 0 ? `<div class="invoice-line invoice-line-tfare"><span>Tfare (Transport)</span><span>${formatMoney(tfare)}</span></div>` : '';
+  const breakdownHtml = tfare > 0 ? `
+    <div class="invoice-summary-box">
+      <div class="invoice-summary-row">
+        <span>Items total</span>
+        <span>${formatMoney(itemsSum)}</span>
+      </div>
+      <div class="invoice-summary-row tfare-row-highlight">
+        <span>T-fare (Transport)</span>
+        <span>${formatMoney(tfare)}</span>
+      </div>
+    </div>
+  ` : '';
 
   const paymentBoxHtml = accountNumber ? `
     <div class="invoice-payment-box">
@@ -175,7 +218,7 @@ function renderInvoicePreview(invoice) {
     </div>
   ` : '';
 
-  $('#invoicePreview').innerHTML = `<div class="invoice-brand"><div class="brand"><span class="brand-mark">A</span><strong>${escapeHtml(business.name.toUpperCase())}</strong></div><span class="invoice-tag">${paid ? 'PAID' : 'INVOICE'}</span></div><h2 class="invoice-title">Laundry receipt</h2><div class="invoice-meta">${escapeHtml(invoice.invoiceNo)}<br>${nowLabel(new Date(invoice.createdAt))}</div><div class="invoice-client"><b>Billed to</b><br>${escapeHtml(client.name || 'Walk-in client')}${client.phone ? `<br>${escapeHtml(client.phone)}` : ''}</div><div class="invoice-lines">${linesHtml}${tfareHtml}</div><div class="invoice-grand-total"><span>TOTAL ${paid ? 'PAID' : 'DUE'}</span><strong>${formatMoney(invoice.total)}</strong></div>${paymentBoxHtml}<p class="invoice-note">Thank you for choosing ${escapeHtml(business.name)}. We handle your things with care.</p>`;
+  $('#invoicePreview').innerHTML = `<div class="invoice-brand"><div class="brand"><span class="brand-mark">A</span><strong>${escapeHtml(business.name.toUpperCase())}</strong></div><span class="invoice-tag">${paid ? 'PAID' : 'INVOICE'}</span></div><h2 class="invoice-title">Laundry receipt</h2><div class="invoice-meta">${escapeHtml(invoice.invoiceNo)}<br>${nowLabel(new Date(invoice.createdAt))}</div><div class="invoice-client"><b>Billed to</b><br>${escapeHtml(client.name || 'Walk-in client')}${client.phone ? `<br>${escapeHtml(client.phone)}` : ''}</div><div class="invoice-lines">${linesHtml}</div>${breakdownHtml}<div class="invoice-grand-total"><span>TOTAL ${paid ? 'PAID' : 'DUE'}</span><strong>${formatMoney(invoice.total)}</strong></div>${paymentBoxHtml}<p class="invoice-note">Thank you for choosing ${escapeHtml(business.name)}. We handle your things with care.</p>`;
   const statusButton = $('#markPaidButton'); statusButton.textContent = paid ? 'Marked as paid' : 'Mark invoice as paid'; statusButton.classList.toggle('is-paid', paid); statusButton.disabled = paid;
 }
 function renderAdminInvoiceList() {
@@ -269,20 +312,48 @@ function markActiveInvoicePaid() {
   invoices = invoices.map(invoice => invoice.id === activeInvoice.id ? activeInvoice : invoice);
   saveInvoices(); renderInvoicePreview(activeInvoice); renderHistory(); toast('Invoice marked as paid');
 }
+function downloadReceiptBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+async function downloadActiveInvoiceImage() {
+  if (!activeInvoice) return;
+  try {
+    const blob = await createReceiptImage(activeInvoice);
+    if (!blob) throw new Error('Could not generate receipt image');
+    downloadReceiptBlob(blob, `${activeInvoice.invoiceNo}.png`);
+    toast('Receipt image saved');
+  } catch (err) {
+    console.error(err);
+    toast('Could not save receipt image');
+  }
+}
+
 async function createReceiptImage(invoice) {
-  const width = 1080, padding = 76, row = 59, client = invoice.client || {};
-  const tfare = Number(invoice.tfare || 0);
+  if (document.fonts?.ready) {
+    try { await document.fonts.ready; } catch {}
+  }
+  const width = 1080, padding = 76, row = 58, client = invoice.client || {};
+  const tfare = getInvoiceTfare(invoice);
+  const itemsSum = (invoice.items || []).reduce((sum, it) => sum + (Number(it.price) || 0) * (Number(it.quantity) || 1), 0);
   const accountNumber = invoice.accountNumber || business.accountNumber || '';
   const bankName = invoice.bankName || business.bankName || '';
   const accountName = invoice.accountName || business.accountName || '';
   const hasAccount = Boolean(accountNumber);
 
   let extraHeight = 0;
-  if (tfare > 0) extraHeight += row;
+  if (tfare > 0) extraHeight += (row * 2) + 20;
   if (hasAccount) extraHeight += 160;
   if (client.phone) extraHeight += 28;
 
-  const height = 580 + invoice.items.length * row + extraHeight;
+  const height = 580 + (invoice.items.length * row) + extraHeight;
   const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height;
   const ctx = canvas.getContext('2d');
   ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, width, height);
@@ -294,22 +365,28 @@ async function createReceiptImage(invoice) {
   if (client.phone) { ctx.fillStyle = '#71807c'; ctx.font = '19px Manrope, Arial'; ctx.fillText(client.phone, padding, 283); }
 
   let y = 349; ctx.fillStyle = '#59716c'; ctx.font = '700 16px Manrope, Arial'; ctx.fillText('ITEM', padding, y); ctx.textAlign = 'right'; ctx.fillText('AMOUNT', width - padding, y); ctx.textAlign = 'left';
-  y += 31; ctx.strokeStyle = '#dfe6e0'; ctx.beginPath(); ctx.moveTo(padding, y); ctx.lineTo(width - padding, y); ctx.stroke(); y += 42;
+  y += 31; ctx.strokeStyle = '#dfe6e0'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(padding, y); ctx.lineTo(width - padding, y); ctx.stroke(); y += 42;
 
   invoice.items.forEach(item => {
     ctx.fillStyle = '#1e3c3b'; ctx.font = '700 21px Manrope, Arial'; ctx.fillText(`${item.name} × ${item.quantity}`, padding, y);
-    ctx.textAlign = 'right'; ctx.font = '600 19px Manrope, Arial'; ctx.fillText(formatMoney(item.price * item.quantity), width - padding, y);
+    ctx.textAlign = 'right'; ctx.font = '600 20px Manrope, Arial'; ctx.fillText(formatMoney(item.price * item.quantity), width - padding, y);
     ctx.textAlign = 'left'; y += row;
   });
 
   if (tfare > 0) {
-    ctx.fillStyle = '#22584c'; ctx.font = '700 21px Manrope, Arial'; ctx.fillText('Tfare (Transport)', padding, y);
-    ctx.textAlign = 'right'; ctx.font = '600 19px Manrope, Arial'; ctx.fillText(formatMoney(tfare), width - padding, y);
+    ctx.strokeStyle = '#e2ebe6'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(padding, y - 20); ctx.lineTo(width - padding, y - 20); ctx.stroke();
+    y += 10;
+    ctx.fillStyle = '#657e76'; ctx.font = '600 20px Manrope, Arial'; ctx.fillText('Items total', padding, y);
+    ctx.textAlign = 'right'; ctx.font = '700 20px Manrope, Arial'; ctx.fillText(formatMoney(itemsSum), width - padding, y);
+    ctx.textAlign = 'left'; y += row;
+
+    ctx.fillStyle = '#1e5447'; ctx.font = '800 22px Manrope, Arial'; ctx.fillText('T-fare (Transport)', padding, y);
+    ctx.textAlign = 'right'; ctx.font = '800 22px Manrope, Arial'; ctx.fillText(formatMoney(tfare), width - padding, y);
     ctx.textAlign = 'left'; y += row;
   }
 
-  ctx.strokeStyle = '#9cafaa'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(padding, y - 22); ctx.lineTo(width - padding, y - 22); ctx.stroke();
-  ctx.fillStyle = '#58706b'; ctx.font = '700 17px Manrope, Arial'; ctx.fillText(`TOTAL ${invoice.status === 'paid' ? 'PAID' : 'DUE'}`, padding, y + 29);
+  ctx.strokeStyle = '#9cafaa'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(padding, y - 18); ctx.lineTo(width - padding, y - 18); ctx.stroke();
+  ctx.fillStyle = '#58706b'; ctx.font = '700 18px Manrope, Arial'; ctx.fillText(`TOTAL ${invoice.status === 'paid' ? 'PAID' : 'DUE'}`, padding, y + 29);
   ctx.textAlign = 'right'; ctx.fillStyle = '#10282a'; ctx.font = '800 39px Manrope, Arial'; ctx.fillText(formatMoney(invoice.total), width - padding, y + 33);
   ctx.textAlign = 'left';
 
@@ -339,27 +416,42 @@ async function createReceiptImage(invoice) {
 async function shareInvoice() {
   if (!activeInvoice) return;
   const client = activeInvoice.client || {};
-  const tfare = Number(activeInvoice.tfare || 0);
+  const tfare = getInvoiceTfare(activeInvoice);
+  const itemsSum = (activeInvoice.items || []).reduce((sum, it) => sum + (Number(it.price) || 0) * (Number(it.quantity) || 1), 0);
   const accountNumber = activeInvoice.accountNumber || business.accountNumber || '';
   const bankName = activeInvoice.bankName || business.bankName || '';
   const accountName = activeInvoice.accountName || business.accountName || '';
 
   const lines = activeInvoice.items.map(item => `• ${item.name} × ${item.quantity} — ${formatMoney(item.price * item.quantity)}`).join('\n');
-  const tfareLine = tfare > 0 ? `\n• Tfare (Transport) — ${formatMoney(tfare)}` : '';
+  const tfareSection = tfare > 0 ? `\n\nItems total: ${formatMoney(itemsSum)}\nT-fare (Transport): ${formatMoney(tfare)}` : '';
   const paymentInfo = accountNumber ? `\n\nPAYMENT DETAILS:\n• Account Number: ${accountNumber}${bankName ? `\n• Bank: ${bankName}` : ''}${accountName ? `\n• Account Name: ${accountName}` : ''}` : '';
 
-  const text = `${business.name.toUpperCase()} INVOICE · ${activeInvoice.invoiceNo}\n${nowLabel(new Date(activeInvoice.createdAt))}\nFor: ${client.name || 'Walk-in client'}\n\n${lines}${tfareLine}\n\nTOTAL: ${formatMoney(activeInvoice.total)}${paymentInfo}\n\nThank you for choosing ${business.name}.`;
+  const text = `${business.name.toUpperCase()} INVOICE · ${activeInvoice.invoiceNo}\n${nowLabel(new Date(activeInvoice.createdAt))}\nFor: ${client.name || 'Walk-in client'}\n\n${lines}${tfareSection}\n\nTOTAL: ${formatMoney(activeInvoice.total)}${paymentInfo}\n\nThank you for choosing ${business.name}.`;
   try {
-    if (navigator.share) {
-      const image = await createReceiptImage(activeInvoice);
-      const file = image && new File([image], `${activeInvoice.invoiceNo}.png`, { type:'image/png' });
-      await navigator.share(file && navigator.canShare?.({ files:[file] }) ? { title:`${business.name} invoice`, text, files:[file] } : { title:`${business.name} invoice`, text });
-    } else {
-      await navigator.clipboard.writeText(text);
-      toast('Invoice copied to clipboard');
+    const imageBlob = await createReceiptImage(activeInvoice);
+    const file = imageBlob && new File([imageBlob], `${activeInvoice.invoiceNo}.png`, { type:'image/png' });
+    if (navigator.share && file && navigator.canShare?.({ files:[file] })) {
+      await navigator.share({ title:`${business.name} invoice`, text, files:[file] });
+      return;
     }
+    if (navigator.share) {
+      await navigator.share({ title:`${business.name} invoice`, text });
+      return;
+    }
+    if (imageBlob) {
+      downloadReceiptBlob(imageBlob, `${activeInvoice.invoiceNo}.png`);
+    }
+    await navigator.clipboard.writeText(text);
+    toast('Invoice text copied & image saved');
   } catch (error) {
-    if (error.name !== 'AbortError') toast('Could not share the invoice');
+    if (error.name !== 'AbortError') {
+      try {
+        await navigator.clipboard.writeText(text);
+        toast('Invoice copied to clipboard');
+      } catch {
+        toast('Could not share the invoice');
+      }
+    }
   }
 }
 
@@ -367,23 +459,17 @@ $('#dateChip').textContent = nowLabel(); setInterval(() => $('#dateChip').textCo
 renderBusinessBranding(); renderCatalog(); renderCart(); updateHistoryBadge(); renderAdminInvoiceList();
 
 $('#tfareToggle')?.addEventListener('change', event => {
-  tfareEnabled = event.target.checked;
-  const input = $('#tfareAmount');
-  const presets = $('#tfarePresets');
-  if (input) input.disabled = !tfareEnabled;
-  if (presets) presets.hidden = !tfareEnabled;
-  if (tfareEnabled) {
-    if (input) {
-      input.focus();
-      if (!input.value && tfareAmount > 0) input.value = tfareAmount;
-    }
+  if (event.target.checked) {
+    const nextAmount = tfareAmount > 0 ? tfareAmount : 1000;
+    setTfare(nextAmount, true);
+  } else {
+    setTfare(0, false);
   }
-  renderCart();
 });
 
 $('#tfareAmount')?.addEventListener('input', event => {
-  tfareAmount = Math.max(0, Number(event.target.value) || 0);
-  renderCart();
+  const val = Math.max(0, Number(event.target.value) || 0);
+  setTfare(val, false);
 });
 
 document.addEventListener('click', event => {
@@ -416,10 +502,8 @@ document.addEventListener('click', event => {
   const preset = event.target.closest('[data-tfare-preset]');
   if (preset) {
     const val = Number(preset.dataset.tfarePreset) || 0;
-    tfareAmount = val;
-    const input = $('#tfareAmount');
-    if (input) input.value = val;
-    renderCart();
+    setTfare(val, false);
+    return;
   }
   const copyBtn = event.target.closest('.copy-account-btn');
   if (copyBtn) {
@@ -437,15 +521,7 @@ document.addEventListener('click', event => {
   }
   if (event.target.closest('#clearButton')) {
     cart = [];
-    tfareEnabled = false;
-    tfareAmount = 0;
-    if ($('#tfareToggle')) $('#tfareToggle').checked = false;
-    if ($('#tfareAmount')) {
-      $('#tfareAmount').value = '';
-      $('#tfareAmount').disabled = true;
-    }
-    if ($('#tfarePresets')) $('#tfarePresets').hidden = true;
-    renderCart();
+    setTfare(0, false);
   }
 });
 $('#priceEditor').addEventListener('change', event => { if (!event.target.matches('[data-price-id]')) return; const service = services.find(item => item.id === event.target.dataset.priceId); if (!service) return; service.price = Math.max(0, Number(event.target.value) || 0); const cartItem = cart.find(item => item.id === service.id); if (cartItem) cartItem.price = service.price; saveServices(); renderCart(); toast('Price updated'); });
@@ -463,7 +539,10 @@ $('#businessProfileForm').addEventListener('submit', event => {
 $('#newItemForm').addEventListener('submit', event => { event.preventDefault(); const name = $('#newItemName').value.trim(); const price = Number($('#newItemPrice').value); if (!name || Number.isNaN(price)) return; services.push({ id:`custom-${Date.now()}`, name, category:newItemCategory, price }); saveServices(); activeCategory = newItemCategory; $('#newItemForm').reset(); renderPriceEditor(); document.querySelectorAll('.category-tab').forEach(tab => { const active = tab.dataset.category === activeCategory; tab.classList.toggle('active', active); tab.setAttribute('aria-selected', active); }); renderCatalog(); toast(`${name} added to price list`); });
 $('#historySearch').addEventListener('input', renderHistory);
 $('#createInvoiceButton').addEventListener('click', () => { if (!cart.length) { toast('Add at least one laundry item first'); return; } createInvoice(); openModal('invoiceModal'); toast('Invoice saved to your records'); });
-$('#shareButton').addEventListener('click', shareInvoice); $('#printButton').addEventListener('click', () => window.print()); $('#markPaidButton').addEventListener('click', markActiveInvoicePaid);
+$('#shareButton').addEventListener('click', shareInvoice);
+$('#downloadImageButton')?.addEventListener('click', downloadActiveInvoiceImage);
+$('#printButton').addEventListener('click', () => window.print());
+$('#markPaidButton').addEventListener('click', markActiveInvoicePaid);
 document.addEventListener('keydown', event => { if (event.key === 'Escape') document.querySelectorAll('.modal-backdrop.open').forEach(modal => closeModal(modal.id)); });
 
 async function requestInstall() {

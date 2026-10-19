@@ -96,11 +96,11 @@
 
           <div class="tfare-box" id="tfareBox">
             <div class="tfare-row">
-              <label class="tfare-toggle" for="tfareToggle">
+              <label class="tfare-toggle">
                 <input type="checkbox" id="tfareToggle" />
                 <span class="tfare-switch" aria-hidden="true"></span>
                 <span class="tfare-text">
-                  <strong>Add Tfare</strong>
+                  <strong>Add T-fare</strong>
                   <small>Delivery or transport fee</small>
                 </span>
               </label>
@@ -113,13 +113,13 @@
                   step="100"
                   inputmode="numeric"
                   placeholder="0"
-                  disabled
-                  aria-label="Tfare amount"
+                  aria-label="T-fare amount"
                 />
               </div>
             </div>
-            <div class="tfare-presets" id="tfarePresets" hidden>
+            <div class="tfare-presets" id="tfarePresets">
               <span class="presets-label">Quick amount:</span>
+              <button type="button" class="preset-chip" data-tfare-preset="0">None</button>
               <button type="button" class="preset-chip" data-tfare-preset="500">₦500</button>
               <button type="button" class="preset-chip" data-tfare-preset="1000">₦1,000</button>
               <button type="button" class="preset-chip" data-tfare-preset="1500">₦1,500</button>
@@ -133,7 +133,7 @@
               <span id="itemsSubtotal">₦0</span>
             </div>
             <div class="breakdown-line">
-              <span>Tfare (Transport)</span>
+              <span>T-fare (Transport)</span>
               <span id="tfareSubtotal">₦0</span>
             </div>
           </div>
@@ -205,6 +205,7 @@
         <div class="invoice-preview" id="invoicePreview"></div>
         <div class="invoice-actions">
           <button class="secondary-action" id="printButton">Save as PDF</button>
+          <button class="secondary-action" id="downloadImageButton">Save image</button>
           <button class="primary-action" id="shareButton">Share invoice <span>↗</span></button>
         </div>
         <button class="status-action" id="markPaidButton">Mark invoice as paid</button>
